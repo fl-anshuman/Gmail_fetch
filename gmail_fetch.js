@@ -66,6 +66,7 @@ async function authorize() {
   return client;
 }
 
+
 /**
  * Lists the emails in the user's account.
  *
@@ -75,15 +76,17 @@ async function listEmails(auth) {
   const gmail = google.gmail({ version: 'v1', auth });
   const res = await gmail.users.messages.list({
     userId: 'me',
-    maxResults: 10, // Adjust the number of emails to fetch
+    maxResults: 10, 
   });
 
+  
+  
   const messages = res.data.messages;
   if (!messages || messages.length === 0) {
     console.log('No emails found.');
     return;
   }
- 
+  
   console.log('Emails:');
   for (const message of messages) {
     const msg = await gmail.users.messages.get({
@@ -93,6 +96,7 @@ async function listEmails(auth) {
     await saveEmailToDatabase(msg.data);
   }
 }
+authorize().then(listEmails).catch(console.error);
 
 /**
  * Save email to MongoDB database.
@@ -101,23 +105,30 @@ async function listEmails(auth) {
  */
 async function saveEmailToDatabase(emailData) {
   try {
-    const email = new Email({
-      id: emailData.id,
-      threadId: emailData.threadId,
-      labelIds: emailData.labelIds,
-      snippet: emailData.snippet,
-      historyId: emailData.historyId,
-      internalDate: emailData.internalDate,
-      payload: emailData.payload,
-      sizeEstimate: emailData.sizeEstimate,
-      raw: emailData.raw,
-      from: extractHeader(emailData.payload.headers, 'From'),
-      receivedDate: new Date(parseInt(emailData.internalDate)),
-      subject: extractHeader(emailData.payload.headers, 'Subject'),
-      body: extractBody(emailData.payload),
-    });
-    await email.save();
-    console.log(`Saved email with ID: ${emailData.id}`);
+    let existingEmail=null;
+    existingEmail =await Email.findOne({id:emailData.id});
+    if (!existingEmail) {
+      const email = new Email({
+        id: emailData.id,
+        threadId: emailData.threadId,
+        labelIds: emailData.labelIds,
+        snippet: emailData.snippet,
+        historyId: emailData.historyId,
+        internalDate: emailData.internalDate,
+        payload: emailData.payload,
+        sizeEstimate: emailData.sizeEstimate,
+        raw: emailData.raw,
+        from: extractHeader(emailData.payload.headers, 'From'),
+        receivedDate: new Date(parseInt(emailData.internalDate)),
+        subject: extractHeader(emailData.payload.headers, 'Subject'),
+        body: extractBody(emailData.payload),
+      });
+      await email.save();
+      console.log(`Saved email with ID: ${emailData.id}`);
+    } else {
+      // If an email with the same internal date exists, log a message and skip saving
+      console.log(`Email with ID: ${emailData.id} already exists`);
+    }
   } catch (err) {
     console.error(`Failed to save email with ID: ${emailData.id}`, err);
   }
